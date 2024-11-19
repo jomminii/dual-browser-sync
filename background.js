@@ -22,21 +22,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         else if (message.action === 'toggleUrlSync') {
             toggleUrlSync(message.enabled);
+            // 모든 탭에 상태 변경 알림
+            broadcastUrlSyncState(message.enabled);
             sendResponse({ success: true });
         }
         else if (message.action === 'getUrlSyncState') {
             sendResponse({ urlSyncEnabled: windowState.urlSyncEnabled });
         }
+        else if (message.action === 'checkConnection') {
+            const windowId = sender.tab?.windowId;
+            const isConnected = windowId ? windowState.pairs.has(windowId) : false;
+            sendResponse({
+                isConnected,
+                urlSyncEnabled: windowState.urlSyncEnabled
+            });
+        }
     } catch (error) {
         console.log('Background script:', error);
         sendResponse({ success: false, error: error.message });
     }
-    return true; // Will respond asynchronously
+    return true;
 });
 
+// URL 동기화 상태 변경 함수
 function toggleUrlSync(enabled) {
     windowState.urlSyncEnabled = enabled;
     chrome.storage.local.set({ urlSyncEnabled: enabled });
+}
+
+// 모든 탭에 상태 변경을 알리는 함수
+async function broadcastUrlSyncState(enabled) {
+    try {
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+            try {
+                await chrome.tabs.sendMessage(tab.id, {
+                    action: 'urlSyncStateChanged',
+                    enabled: enabled
+                });
+            } catch (err) {
+                // 일부 탭에서 오류가 발생해도 계속 진행
+                console.log('Failed to send message to tab:', tab.id, err);
+            }
+        }
+    } catch (error) {
+        console.log('Broadcasting error:', error);
+    }
 }
 
 async function createSplitWindows(url) {
@@ -89,6 +120,7 @@ async function synchronizeScroll(scrollData, sourceWindowId) {
     }
 }
 
+// 창이 닫힐 때 정리
 chrome.windows.onRemoved.addListener((windowId) => {
     if (windowState.pairs.has(windowId)) {
         const pairedWindowId = windowState.pairs.get(windowId);
@@ -97,6 +129,7 @@ chrome.windows.onRemoved.addListener((windowId) => {
     }
 });
 
+// URL 변경 감지 및 동기화
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.url && windowState.urlSyncEnabled) {
         const windowId = tab.windowId;
