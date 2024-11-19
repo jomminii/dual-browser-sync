@@ -7,7 +7,10 @@ function createOverlay() {
         <div class="sync-controls">
             <div class="header">
                 <span class="title">Sync Control</span>
-                <button id="toggleOverlay">━</button>
+                <div class="header-buttons">
+                    <button id="toggleOverlay" class="icon-button">━</button>
+                    <button id="closeSync" class="icon-button">×</button>
+                </div>
             </div>
             <div class="toggle-container">
                 <label class="switch">
@@ -30,7 +33,6 @@ function createOverlay() {
         </div>
     `;
 
-
     // 토글 버튼 오버레이 생성
     const toggleButton = document.createElement('div');
     toggleButton.id = 'sync-toggle-button';
@@ -38,7 +40,6 @@ function createOverlay() {
         <button id="showOverlay">≡</button>
     `;
 
-    // 스타일 추가
     const style = document.createElement('style');
     style.textContent = `
         #sync-overlay {
@@ -153,7 +154,12 @@ function createOverlay() {
             background-color: #e74c3c;
         }
 
-        #toggleOverlay, #showOverlay {
+        .header-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-button {
             border: none;
             background: transparent;
             color: #bdc3c7;
@@ -164,13 +170,26 @@ function createOverlay() {
             display: flex;
             align-items: center;
             justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
         }
 
-        #toggleOverlay:hover, #showOverlay:hover {
+        .icon-button:hover {
+            color: #fff;
+            background: #34495e;
+        }
+
+        #closeSync {
+            font-size: 20px;
+            color: #e74c3c;
+        }
+
+        #closeSync:hover {
+            background: #c0392b;
             color: #fff;
         }
 
-        /* 항상 표시되는 토글 버튼 스타일 */
         #sync-toggle-button {
             position: fixed;
             top: 20px;
@@ -192,6 +211,15 @@ function createOverlay() {
             border-radius: 4px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
             font-size: 18px;
+            border: none;
+            color: #bdc3c7;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #showOverlay:hover {
+            color: #fff;
+            background: #34495e;
         }
     `;
 
@@ -206,6 +234,7 @@ function setupOverlayListeners() {
     const urlSyncToggle = document.getElementById('urlSyncToggle');
     const scrollSyncToggle = document.getElementById('scrollSyncToggle');
     const toggleOverlay = document.getElementById('toggleOverlay');
+    const closeSync = document.getElementById('closeSync');
     const showOverlay = document.getElementById('showOverlay');
     const overlay = document.getElementById('sync-overlay');
     const toggleButton = document.getElementById('sync-toggle-button');
@@ -225,6 +254,11 @@ function setupOverlayListeners() {
         chrome.runtime.sendMessage({
             action: 'toggleUrlSync',
             enabled: isEnabled
+        }, (response) => {
+            if (!response?.success) {
+                e.target.checked = !isEnabled;
+                console.error('Failed to toggle URL sync');
+            }
         });
     });
 
@@ -234,9 +268,13 @@ function setupOverlayListeners() {
         chrome.runtime.sendMessage({
             action: 'toggleScrollSync',
             enabled: isEnabled
+        }, (response) => {
+            if (!response?.success) {
+                e.target.checked = !isEnabled;
+                console.error('Failed to toggle scroll sync');
+            }
         });
     });
-
 
     // 오버레이 숨기기
     toggleOverlay.addEventListener('click', () => {
@@ -250,6 +288,13 @@ function setupOverlayListeners() {
         overlay.classList.remove('hidden');
         toggleButton.classList.remove('visible');
         chrome.storage.local.set({ overlayHidden: false });
+    });
+
+    // 연동 종료
+    closeSync.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'closeSyncConnection' }, () => {
+            removeOverlay();
+        });
     });
 
     // 저장된 오버레이 상태 로드
@@ -274,20 +319,20 @@ function updateSyncStatus(isConnected) {
     }
 }
 
-// 스크롤 이벤트 핸들러
 function handleScroll() {
     if (!isScrolling) {
         isScrolling = true;
 
-        chrome.runtime.sendMessage({ action: 'getScrollSyncState' }, (response) => {
-            if (response && response.scrollSyncEnabled) {
-                const scrollData = calculateScrollData();
-                chrome.runtime.sendMessage({
-                    action: 'scroll',
-                    data: scrollData
-                });
-            }
-        });
+        const scrollData = calculateScrollData();
+
+        try {
+            chrome.runtime.sendMessage({
+                action: 'scroll',
+                data: scrollData
+            });
+        } catch (error) {
+            console.log('Scroll sync:', error);
+        }
 
         setTimeout(() => {
             isScrolling = false;
@@ -308,6 +353,17 @@ function calculateScrollData() {
     };
 }
 
+function removeOverlay() {
+    const overlay = document.getElementById('sync-overlay');
+    const toggleButton = document.getElementById('sync-toggle-button');
+    if (overlay) {
+        overlay.remove();
+    }
+    if (toggleButton) {
+        toggleButton.remove();
+    }
+}
+
 // 스크롤 이벤트 리스너 (쓰로틀링 적용)
 let scrollTimeout;
 window.addEventListener('scroll', () => {
@@ -324,13 +380,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'scrollTo') {
         executeScroll(message.data);
     }
-    else if (message.action === 'urlSyncStateChanged') {
-        // URL 동기화 상태가 변경되었을 때 UI 업데이트
+    else if (message.action === 'stateChanged') {
         const urlSyncToggle = document.getElementById('urlSyncToggle');
-        if (urlSyncToggle) {
-            urlSyncToggle.checked = message.enabled;
-            updateSyncStatus(message.enabled);
+        const scrollSyncToggle = document.getElementById('scrollSyncToggle');
+        if (urlSyncToggle && message.state.urlSyncEnabled !== undefined) {
+            urlSyncToggle.checked = message.state.urlSyncEnabled;
         }
+        if (scrollSyncToggle && message.state.scrollSyncEnabled !== undefined) {
+            scrollSyncToggle.checked = message.state.scrollSyncEnabled;
+        }
+    }
+    else if (message.action === 'windowClosed') {
+        removeOverlay();
     }
 });
 

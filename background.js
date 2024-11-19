@@ -42,12 +42,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 isConnected: windowId ? windowState.pairs.has(windowId) : false
             });
         }
+        else if (message.action === 'closeSyncConnection') {
+            closeSyncConnection(sender.tab.windowId);
+            sendResponse({ success: true });
+        }
     } catch (error) {
         console.log('Background script:', error);
         sendResponse({ success: false, error: error.message });
     }
     return true;
 });
+
+function toggleUrlSync(enabled) {
+    windowState.urlSyncEnabled = enabled;
+    chrome.storage.local.set({ urlSyncEnabled: enabled });
+}
 
 function toggleScrollSync(enabled) {
     windowState.scrollSyncEnabled = enabled;
@@ -67,32 +76,6 @@ async function broadcastState() {
                     }
                 });
             } catch (err) {
-                console.log('Failed to send message to tab:', tab.id, err);
-            }
-        }
-    } catch (error) {
-        console.log('Broadcasting error:', error);
-    }
-}
-
-// URL 동기화 상태 변경 함수
-function toggleUrlSync(enabled) {
-    windowState.urlSyncEnabled = enabled;
-    chrome.storage.local.set({ urlSyncEnabled: enabled });
-}
-
-// 모든 탭에 상태 변경을 알리는 함수
-async function broadcastUrlSyncState(enabled) {
-    try {
-        const tabs = await chrome.tabs.query({});
-        for (const tab of tabs) {
-            try {
-                await chrome.tabs.sendMessage(tab.id, {
-                    action: 'urlSyncStateChanged',
-                    enabled: enabled
-                });
-            } catch (err) {
-                // 일부 탭에서 오류가 발생해도 계속 진행
                 console.log('Failed to send message to tab:', tab.id, err);
             }
         }
@@ -151,16 +134,41 @@ async function synchronizeScroll(scrollData, sourceWindowId) {
     }
 }
 
-// 창이 닫힐 때 정리
-chrome.windows.onRemoved.addListener((windowId) => {
+function closeSyncConnection(windowId) {
     if (windowState.pairs.has(windowId)) {
         const pairedWindowId = windowState.pairs.get(windowId);
+
+        // 양쪽 창 모두에 창 닫힘 메시지 전송
+        notifyWindowClosed(windowId);
+        notifyWindowClosed(pairedWindowId);
+
+        // 연결 상태 제거
         windowState.pairs.delete(pairedWindowId);
         windowState.pairs.delete(windowId);
     }
+}
+
+async function notifyWindowClosed(windowId) {
+    try {
+        const tabs = await chrome.tabs.query({ windowId });
+        for (const tab of tabs) {
+            try {
+                await chrome.tabs.sendMessage(tab.id, { action: 'windowClosed' });
+            } catch (err) {
+                console.log('Failed to send window closed message:', err);
+            }
+        }
+    } catch (error) {
+        console.log('Notify window closed error:', error);
+    }
+}
+
+chrome.windows.onRemoved.addListener((windowId) => {
+    if (windowState.pairs.has(windowId)) {
+        closeSyncConnection(windowId);
+    }
 });
 
-// URL 변경 감지 및 동기화
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.url && windowState.urlSyncEnabled) {
         const windowId = tab.windowId;
