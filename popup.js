@@ -1,37 +1,37 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // 현재 URL 동기화 상태 로드
+    // 현재 동기화 상태 로드
     chrome.runtime.sendMessage({ action: 'getUrlSyncState' }, (response) => {
-        if (response && response.urlSyncEnabled !== undefined) {
+        if (response) {
             document.getElementById('urlSyncToggle').checked = response.urlSyncEnabled;
+            document.getElementById('scrollSyncToggle').checked = response.scrollSyncEnabled;
         }
     });
-});
 
-document.getElementById('urlSyncToggle').addEventListener('change', (e) => {
-    chrome.runtime.sendMessage({
-        action: 'toggleUrlSync',
-        enabled: e.target.checked
-    }, (response) => {
-        if (!response || !response.success) {
-            console.error('Failed to toggle URL sync');
-        }
+    // URL 동기화 토글
+    document.getElementById('urlSyncToggle').addEventListener('change', (e) => {
+        chrome.runtime.sendMessage({
+            action: 'toggleUrlSync',
+            enabled: e.target.checked
+        });
     });
-});
 
-document.getElementById('splitButton').addEventListener('click', () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            const urlSyncEnabled = document.getElementById('urlSyncToggle').checked;
+    // 스크롤 동기화 토글
+    document.getElementById('scrollSyncToggle').addEventListener('change', (e) => {
+        chrome.runtime.sendMessage({
+            action: 'toggleScrollSync',
+            enabled: e.target.checked
+        });
+    });
 
-            chrome.runtime.sendMessage({
-                action: 'createSplitWindows',
-                url: tabs[0].url,
-                urlSync: urlSyncEnabled
-            }, (response) => {
-                if (!response || !response.success) {
-                    console.error('Failed to create split windows');
-                }
-            });
-        }
+    // Split Window 버튼
+    document.getElementById('splitButton').addEventListener('click', () => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]) {
+                chrome.runtime.sendMessage({
+                    action: 'createSplitWindows',
+                    url: tabs[0].url
+                });
+            }
+        });
     });
 });

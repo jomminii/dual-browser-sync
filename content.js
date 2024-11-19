@@ -1,7 +1,6 @@
 let isScrolling = false;
 
 function createOverlay() {
-    // 메인 오버레이 생성
     const overlay = document.createElement('div');
     overlay.id = 'sync-overlay';
     overlay.innerHTML = `
@@ -17,12 +16,20 @@ function createOverlay() {
                 </label>
                 <span>URL Sync</span>
             </div>
+            <div class="toggle-container">
+                <label class="switch">
+                    <input type="checkbox" id="scrollSyncToggle">
+                    <span class="slider"></span>
+                </label>
+                <span>Scroll Sync</span>
+            </div>
             <div class="sync-status">
                 <span id="syncStatusDot"></span>
                 <span id="syncStatusText">Connected</span>
             </div>
         </div>
     `;
+
 
     // 토글 버튼 오버레이 생성
     const toggleButton = document.createElement('div');
@@ -197,6 +204,7 @@ function createOverlay() {
 
 function setupOverlayListeners() {
     const urlSyncToggle = document.getElementById('urlSyncToggle');
+    const scrollSyncToggle = document.getElementById('scrollSyncToggle');
     const toggleOverlay = document.getElementById('toggleOverlay');
     const showOverlay = document.getElementById('showOverlay');
     const overlay = document.getElementById('sync-overlay');
@@ -204,9 +212,10 @@ function setupOverlayListeners() {
 
     // URL 동기화 상태 로드
     chrome.runtime.sendMessage({ action: 'getUrlSyncState' }, (response) => {
-        if (response && response.urlSyncEnabled !== undefined) {
+        if (response) {
             urlSyncToggle.checked = response.urlSyncEnabled;
-            updateSyncStatus(response.urlSyncEnabled);
+            scrollSyncToggle.checked = response.scrollSyncEnabled;
+            updateSyncStatus(response.isConnected);
         }
     });
 
@@ -216,16 +225,18 @@ function setupOverlayListeners() {
         chrome.runtime.sendMessage({
             action: 'toggleUrlSync',
             enabled: isEnabled
-        }, (response) => {
-            if (response && response.success) {
-                updateSyncStatus(isEnabled);
-            } else {
-                e.target.checked = !isEnabled;
-                updateSyncStatus(!isEnabled);
-                console.error('Failed to toggle URL sync');
-            }
         });
     });
+
+    // 스크롤 동기화 토글 이벤트
+    scrollSyncToggle.addEventListener('change', (e) => {
+        const isEnabled = e.target.checked;
+        chrome.runtime.sendMessage({
+            action: 'toggleScrollSync',
+            enabled: isEnabled
+        });
+    });
+
 
     // 오버레이 숨기기
     toggleOverlay.addEventListener('click', () => {
@@ -268,16 +279,15 @@ function handleScroll() {
     if (!isScrolling) {
         isScrolling = true;
 
-        const scrollData = calculateScrollData();
-
-        try {
-            chrome.runtime.sendMessage({
-                action: 'scroll',
-                data: scrollData
-            });
-        } catch (error) {
-            console.log('Scroll sync:', error);
-        }
+        chrome.runtime.sendMessage({ action: 'getScrollSyncState' }, (response) => {
+            if (response && response.scrollSyncEnabled) {
+                const scrollData = calculateScrollData();
+                chrome.runtime.sendMessage({
+                    action: 'scroll',
+                    data: scrollData
+                });
+            }
+        });
 
         setTimeout(() => {
             isScrolling = false;

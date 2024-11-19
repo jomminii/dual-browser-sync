@@ -1,40 +1,45 @@
 const windowState = {
     pairs: new Map(),
-    urlSyncEnabled: true
+    urlSyncEnabled: true,
+    scrollSyncEnabled: true
 };
 
 // 스토리지에서 설정 로드
-chrome.storage.local.get(['urlSyncEnabled'], (result) => {
+chrome.storage.local.get(['urlSyncEnabled', 'scrollSyncEnabled'], (result) => {
     if (result.urlSyncEnabled !== undefined) {
         windowState.urlSyncEnabled = result.urlSyncEnabled;
+    }
+    if (result.scrollSyncEnabled !== undefined) {
+        windowState.scrollSyncEnabled = result.scrollSyncEnabled;
     }
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
         if (message.action === 'createSplitWindows') {
-            createSplitWindows(message.url, message.urlSync);
+            createSplitWindows(message.url);
             sendResponse({ success: true });
         }
-        else if (message.action === 'scroll') {
+        else if (message.action === 'scroll' && windowState.scrollSyncEnabled) {
             synchronizeScroll(message.data, sender.tab.windowId);
             sendResponse({ success: true });
         }
         else if (message.action === 'toggleUrlSync') {
             toggleUrlSync(message.enabled);
-            // 모든 탭에 상태 변경 알림
-            broadcastUrlSyncState(message.enabled);
+            broadcastState();
             sendResponse({ success: true });
         }
-        else if (message.action === 'getUrlSyncState') {
-            sendResponse({ urlSyncEnabled: windowState.urlSyncEnabled });
+        else if (message.action === 'toggleScrollSync') {
+            toggleScrollSync(message.enabled);
+            broadcastState();
+            sendResponse({ success: true });
         }
-        else if (message.action === 'checkConnection') {
+        else if (message.action === 'getUrlSyncState' || message.action === 'getScrollSyncState') {
             const windowId = sender.tab?.windowId;
-            const isConnected = windowId ? windowState.pairs.has(windowId) : false;
             sendResponse({
-                isConnected,
-                urlSyncEnabled: windowState.urlSyncEnabled
+                urlSyncEnabled: windowState.urlSyncEnabled,
+                scrollSyncEnabled: windowState.scrollSyncEnabled,
+                isConnected: windowId ? windowState.pairs.has(windowId) : false
             });
         }
     } catch (error) {
@@ -43,6 +48,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     return true;
 });
+
+function toggleScrollSync(enabled) {
+    windowState.scrollSyncEnabled = enabled;
+    chrome.storage.local.set({ scrollSyncEnabled: enabled });
+}
+
+async function broadcastState() {
+    try {
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+            try {
+                await chrome.tabs.sendMessage(tab.id, {
+                    action: 'stateChanged',
+                    state: {
+                        urlSyncEnabled: windowState.urlSyncEnabled,
+                        scrollSyncEnabled: windowState.scrollSyncEnabled
+                    }
+                });
+            } catch (err) {
+                console.log('Failed to send message to tab:', tab.id, err);
+            }
+        }
+    } catch (error) {
+        console.log('Broadcasting error:', error);
+    }
+}
 
 // URL 동기화 상태 변경 함수
 function toggleUrlSync(enabled) {
