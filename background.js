@@ -1,23 +1,44 @@
-// 창 관리를 위한 상태 객체
 const windowState = {
-    pairs: new Map()
+    pairs: new Map(),
+    urlSyncEnabled: true
 };
 
-// 메시지 리스너 수정
-chrome.runtime.onMessage.addListener((message, sender) => {
-    try {
-        if (message.action === 'createSplitWindows') {
-            createSplitWindows(message.url);
-        }
-        else if (message.action === 'scroll') {
-            synchronizeScroll(message.data, sender.tab.windowId);
-        }
-    } catch (error) {
-        console.log('Background script:', error);
+// 스토리지에서 설정 로드
+chrome.storage.local.get(['urlSyncEnabled'], (result) => {
+    if (result.urlSyncEnabled !== undefined) {
+        windowState.urlSyncEnabled = result.urlSyncEnabled;
     }
 });
 
-// 분할 창 생성
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    try {
+        if (message.action === 'createSplitWindows') {
+            createSplitWindows(message.url, message.urlSync);
+            sendResponse({ success: true });
+        }
+        else if (message.action === 'scroll') {
+            synchronizeScroll(message.data, sender.tab.windowId);
+            sendResponse({ success: true });
+        }
+        else if (message.action === 'toggleUrlSync') {
+            toggleUrlSync(message.enabled);
+            sendResponse({ success: true });
+        }
+        else if (message.action === 'getUrlSyncState') {
+            sendResponse({ urlSyncEnabled: windowState.urlSyncEnabled });
+        }
+    } catch (error) {
+        console.log('Background script:', error);
+        sendResponse({ success: false, error: error.message });
+    }
+    return true; // Will respond asynchronously
+});
+
+function toggleUrlSync(enabled) {
+    windowState.urlSyncEnabled = enabled;
+    chrome.storage.local.set({ urlSyncEnabled: enabled });
+}
+
 async function createSplitWindows(url) {
     try {
         const currentWindow = await chrome.windows.getCurrent();
@@ -51,7 +72,6 @@ async function createSplitWindows(url) {
     }
 }
 
-// 스크롤 동기화 수정
 async function synchronizeScroll(scrollData, sourceWindowId) {
     try {
         const targetWindowId = windowState.pairs.get(sourceWindowId);
@@ -69,7 +89,6 @@ async function synchronizeScroll(scrollData, sourceWindowId) {
     }
 }
 
-// 창이 닫힐 때 정리
 chrome.windows.onRemoved.addListener((windowId) => {
     if (windowState.pairs.has(windowId)) {
         const pairedWindowId = windowState.pairs.get(windowId);
@@ -78,9 +97,8 @@ chrome.windows.onRemoved.addListener((windowId) => {
     }
 });
 
-// 탭 업데이트 감지
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (changeInfo.url) {
+    if (changeInfo.url && windowState.urlSyncEnabled) {
         const windowId = tab.windowId;
         const pairedWindowId = windowState.pairs.get(windowId);
 
