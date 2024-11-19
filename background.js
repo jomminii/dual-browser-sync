@@ -2,6 +2,21 @@
 class WindowManager {
     constructor() {
         this.pairs = new Map();
+        this.activeWindows = new Set();
+
+        // 이벤트 리스너 바인딩
+        this.handleWindowRemoved = this.handleWindowRemoved.bind(this);
+        this.handleUrlChange = this.handleUrlChange.bind(this);
+        this.synchronizeScroll = this.synchronizeScroll.bind(this);
+        this.isPaired = this.isPaired.bind(this);
+
+        // 이벤트 리스너 등록
+        chrome.windows.onRemoved.addListener(this.handleWindowRemoved);
+        chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+            if (changeInfo.url && syncManager.isUrlSyncEnabled()) {
+                this.handleUrlChange(tab.windowId, changeInfo.url);
+            }
+        });
     }
 
     async createSplitWindows(url) {
@@ -31,15 +46,37 @@ class WindowManager {
                 type: 'normal'
             });
 
+            // 활성화된 윈도우 추가
+            this.activeWindows.add(currentWindow.id);
+            this.activeWindows.add(rightWindow.id);
+
             this.pairs.set(currentWindow.id, rightWindow.id);
             this.pairs.set(rightWindow.id, currentWindow.id);
+
+            // 활성화된 윈도우들에 overlay 표시 메시지 전송
+            this.notifyOverlayStatus(currentWindow.id, true);
+            this.notifyOverlayStatus(rightWindow.id, true);
 
         } catch (error) {
             console.error('Window creation error:', error);
         }
     }
 
-    async synchronizeScroll(scrollData, sourceWindowId) {
+    async notifyOverlayStatus(windowId, show) {
+        try {
+            const tabs = await chrome.tabs.query({ windowId });
+            for (const tab of tabs) {
+                await chrome.tabs.sendMessage(tab.id, {
+                    action: 'updateOverlayVisibility',
+                    show: show
+                }).catch(() => {});
+            }
+        } catch (error) {
+            console.error('Overlay notification error:', error);
+        }
+    }
+
+    synchronizeScroll = async (scrollData, sourceWindowId) => {
         try {
             const targetWindowId = this.pairs.get(sourceWindowId);
             if (!targetWindowId) return;
@@ -56,15 +93,19 @@ class WindowManager {
         }
     }
 
-    isPaired(windowId) {
+    isPaired = (windowId) => {
         return this.pairs.has(windowId);
     }
 
-    getPairedWindowId(windowId) {
+    isActiveWindow = (windowId) => {
+        return this.activeWindows.has(windowId);
+    }
+
+    getPairedWindowId = (windowId) => {
         return this.pairs.get(windowId);
     }
 
-    async handleUrlChange(windowId, newUrl) {
+    handleUrlChange = async (windowId, newUrl) => {
         const pairedWindowId = this.pairs.get(windowId);
         if (!pairedWindowId) return;
 
@@ -83,6 +124,9 @@ class WindowManager {
             const pairedWindowId = this.pairs.get(windowId);
             this.notifyWindowClosed(windowId);
             this.notifyWindowClosed(pairedWindowId);
+            // 활성화된 윈도우에서 제거
+            this.activeWindows.delete(windowId);
+            this.activeWindows.delete(pairedWindowId);
             this.pairs.delete(pairedWindowId);
             this.pairs.delete(windowId);
         }
@@ -101,10 +145,33 @@ class WindowManager {
         }
     }
 
-    handleWindowRemoved(windowId) {
+    handleWindowRemoved = (windowId) => {
         this.closeSyncConnection(windowId);
     }
 }
+// 메시지 리스너 수정
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    try {
+        switch (message.action) {
+            case 'getUrlSyncState':
+                const windowId = sender.tab?.windowId;
+                sendResponse({
+                    urlSyncEnabled: syncManager.isUrlSyncEnabled(),
+                    scrollSyncEnabled: syncManager.isScrollSyncEnabled(),
+                    isConnected: windowId ? windowManager.isPaired(windowId) : false,
+                    // 오버레이 표시 여부 추가
+                    showOverlay: windowId ? windowManager.isActiveWindow(windowId) : false
+                });
+                break;
+            // ... 나머지 case문들은 그대로 유지
+        }
+        sendResponse({ success: true });
+    } catch (error) {
+        console.error('Background script error:', error);
+        sendResponse({ success: false, error: error.message });
+    }
+    return true;
+});
 
 // SyncManager 클래스 정의
 class SyncManager {
@@ -195,9 +262,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({
                     urlSyncEnabled: syncManager.isUrlSyncEnabled(),
                     scrollSyncEnabled: syncManager.isScrollSyncEnabled(),
-                    isConnected: windowId ? windowManager.isPaired(windowId) : false
+                    isConnected: windowId ? windowManager.isPaired(windowId) : false,
+                    showOverlay: windowId ? windowManager.isActiveWindow(windowId) : false
                 });
-                break;
+                return true;
             case 'closeSyncConnection':
                 windowManager.closeSyncConnection(sender.tab.windowId);
                 break;
@@ -208,15 +276,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
     }
     return true;
-});
-
-// 이벤트 리스너
-chrome.windows.onRemoved.addListener((windowId) => {
-    windowManager.handleWindowRemoved(windowId);
-});
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.url && syncManager.isUrlSyncEnabled()) {
-        windowManager.handleUrlChange(tab.windowId, changeInfo.url);
-    }
 });

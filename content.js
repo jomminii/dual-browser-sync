@@ -18,6 +18,20 @@ class ContentScript {
                 case 'windowClosed':
                     this.overlay.removeOverlay();
                     break;
+                case 'updateOverlayVisibility':
+                    if (message.show) {
+                        this.overlay.createOverlay();
+                    } else {
+                        this.overlay.removeOverlay();
+                    }
+                    break;
+            }
+        });
+
+        // 초기 상태 확인
+        chrome.runtime.sendMessage({ action: 'getUrlSyncState' }, (response) => {
+            if (response && response.showOverlay) {
+                this.overlay.createOverlay();
             }
         });
 
@@ -29,9 +43,6 @@ class ContentScript {
                 }
             });
         }, 5000);
-
-        // 오버레이 생성
-        this.overlay.createOverlay();
     }
 }
 
