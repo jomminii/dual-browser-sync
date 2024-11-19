@@ -21,13 +21,24 @@ class WindowManager {
 
     async createSplitWindows(url) {
         try {
+            // 현재 창의 정보를 가져옴
             const currentWindow = await chrome.windows.getCurrent();
-            const displays = await chrome.system.display.getInfo();
-            const display = displays[0];  // 주 디스플레이 사용
 
-            const workArea = display.workArea;
+            // 모든 디스플레이 정보를 가져옴
+            const displays = await chrome.system.display.getInfo();
+
+            // 현재 창의 위치를 기반으로 현재 모니터 찾기
+            const currentDisplay = this.getCurrentDisplay(displays, currentWindow);
+
+            if (!currentDisplay) {
+                console.error('현재 디스플레이를 찾을 수 없습니다.');
+                return;
+            }
+
+            const workArea = currentDisplay.workArea;
             const width = Math.floor(workArea.width / 2);
 
+            // 현재 창을 왼쪽으로 이동 및 크기 조정
             await chrome.windows.update(currentWindow.id, {
                 left: workArea.left,
                 top: workArea.top,
@@ -36,6 +47,7 @@ class WindowManager {
                 state: 'normal'
             });
 
+            // 새 창을 오른쪽에 생성
             const rightWindow = await chrome.windows.create({
                 url: url,
                 width: width,
@@ -60,6 +72,22 @@ class WindowManager {
         } catch (error) {
             console.error('Window creation error:', error);
         }
+    }
+
+    // 현재 창이 위치한 디스플레이를 찾는 메서드
+    getCurrentDisplay(displays, currentWindow) {
+        // 현재 창의 중심점 계산
+        const windowCenterX = currentWindow.left + (currentWindow.width / 2);
+        const windowCenterY = currentWindow.top + (currentWindow.height / 2);
+
+        // 창의 중심점이 포함된 디스플레이를 찾음
+        return displays.find(display => {
+            const bounds = display.bounds;
+            return windowCenterX >= bounds.left &&
+                   windowCenterX <= bounds.left + bounds.width &&
+                   windowCenterY >= bounds.top &&
+                   windowCenterY <= bounds.top + bounds.height;
+        }) || displays[0]; // 찾지 못한 경우 기본 디스플레이 반환
     }
 
     async notifyOverlayStatus(windowId, show) {
