@@ -1,0 +1,26 @@
+{
+    "extensionName": {
+        "message": "Dual Page Sync"
+    },
+    "extensionDescription": {
+        "message": "View two pages side by side with synchronized scrolling"
+    },
+    "syncControl": {
+        "message": "Sync Control"
+    },
+    "urlSync": {
+        "message": "URL Sync"
+    },
+    "scrollSync": {
+        "message": "Scroll Sync"
+    },
+    "connected": {
+        "message": "Connected"
+    },
+    "disconnected": {
+        "message": "Disconnected"
+    },
+    "reconnect": {
+        "message": "Reconnect"
+    }
+}

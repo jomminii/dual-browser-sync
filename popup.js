@@ -1,4 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // i18n 적용
+    document.getElementById('popupTitle').textContent = chrome.i18n.getMessage('syncControl');
+    document.getElementById('urlSyncLabel').textContent = chrome.i18n.getMessage('urlSync');
+    document.getElementById('scrollSyncLabel').textContent = chrome.i18n.getMessage('scrollSync');
+    document.getElementById('splitButton').textContent = chrome.i18n.getMessage('extensionName');
+
+
     // 현재 동기화 상태 로드
     chrome.runtime.sendMessage({ action: 'getUrlSyncState' }, (response) => {
         if (response) {

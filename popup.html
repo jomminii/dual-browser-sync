@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <style>
         body {
             width: 240px;
@@ -96,25 +97,28 @@
     </style>
 </head>
 <body>
-    <div class="header">Split Window Settings</div>
-
-    <div class="toggle-container">
-        <label class="switch">
-            <input type="checkbox" id="urlSyncToggle" checked>
-            <span class="slider"></span>
-        </label>
-        <span class="label-text">URL Sync</span>
+    <div class="header">
+        <span class="title" id="popupTitle"></span>
     </div>
 
     <div class="toggle-container">
         <label class="switch">
-            <input type="checkbox" id="scrollSyncToggle" checked>
+            <input type="checkbox" id="urlSyncToggle">
             <span class="slider"></span>
         </label>
-        <span class="label-text">Scroll Sync</span>
+        <span id="urlSyncLabel"></span>
     </div>
 
-    <button id="splitButton">Split Window</button>
+    <div class="toggle-container">
+        <label class="switch">
+            <input type="checkbox" id="scrollSyncToggle">
+            <span class="slider"></span>
+        </label>
+        <span id="scrollSyncLabel"></span>
+    </div>
+
+    <button id="splitButton"></button>
+
     <script src="popup.js"></script>
 </body>
 </html>

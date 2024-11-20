@@ -1,0 +1,26 @@
+{
+    "extensionName": {
+        "message": "듀얼 페이지 싱크"
+    },
+    "extensionDescription": {
+        "message": "두 페이지를 나란히 보면서 스크롤을 동기화합니다"
+    },
+    "syncControl": {
+        "message": "동기화 제어"
+    },
+    "urlSync": {
+        "message": "URL 동기화"
+    },
+    "scrollSync": {
+        "message": "스크롤 동기화"
+    },
+    "connected": {
+        "message": "연결됨"
+    },
+    "disconnected": {
+        "message": "연결 끊김"
+    },
+    "reconnect": {
+        "message": "재연결"
+    }
+}

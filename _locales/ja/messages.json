@@ -1,0 +1,26 @@
+{
+    "extensionName": {
+        "message": "デュアルページ同期"
+    },
+    "extensionDescription": {
+        "message": "2つのページを並べて表示し、スクロールを同期します"
+    },
+    "syncControl": {
+        "message": "同期制御"
+    },
+    "urlSync": {
+        "message": "URL同期"
+    },
+    "scrollSync": {
+        "message": "スクロール同期"
+    },
+    "connected": {
+        "message": "接続済み"
+    },
+    "disconnected": {
+        "message": "切断"
+    },
+    "reconnect": {
+        "message": "再接続"
+    }
+}

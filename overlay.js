@@ -12,13 +12,17 @@ class OverlayManager {
         this.setupListeners();
     }
 
+    getMessage(messageKey) {
+        return chrome.i18n.getMessage(messageKey) || messageKey;
+    }
+
     createOverlayElement() {
         this.overlay = document.createElement('div');
         this.overlay.id = 'sync-overlay';
         this.overlay.innerHTML = `
             <div class="sync-controls">
                 <div class="header">
-                    <span class="title">Sync Control</span>
+                    <span class="title">${this.getMessage('syncControl')}</span>
                     <div class="header-buttons">
                         <button id="toggleOverlay" class="icon-button">━</button>
                         <button id="closeSync" class="icon-button">×</button>
@@ -29,22 +33,22 @@ class OverlayManager {
                         <input type="checkbox" id="urlSyncToggle">
                         <span class="slider"></span>
                     </label>
-                    <span>URL Sync</span>
+                    <span>${this.getMessage('urlSync')}</span>
                 </div>
                 <div class="toggle-container">
                     <label class="switch">
                         <input type="checkbox" id="scrollSyncToggle">
                         <span class="slider"></span>
                     </label>
-                    <span>Scroll Sync</span>
+                    <span>${this.getMessage('scrollSync')}</span>
                 </div>
                 <div class="sync-status-container">
                     <div class="sync-status">
                         <span id="syncStatusDot"></span>
-                        <span id="syncStatusText">Connected</span>
+                        <span id="syncStatusText">${this.getMessage('connected')}</span>
                     </div>
                     <button id="reconnectButton" class="reconnect-button hidden">
-                        재연결
+                        ${this.getMessage('reconnect')}
                     </button>
                 </div>
             </div>
@@ -120,17 +124,26 @@ class OverlayManager {
 
     async handleReconnect() {
         try {
-            chrome.runtime.sendMessage({
+            // 재연결 버튼 비활성화
+            const reconnectButton = document.getElementById('reconnectButton');
+            if (reconnectButton) {
+                reconnectButton.disabled = true;
+                reconnectButton.textContent = '연결 중...';
+            }
+
+            await chrome.runtime.sendMessage({
                 action: 'createSplitWindows',
                 url: this.currentUrl
-            }, (response) => {
-                if (response?.success) {
-                    this.updateSyncStatus(true);
-                    this.isConnected = true;
-                }
             });
+
+            // 상태 업데이트는 background에서 오는 메시지를 통해 처리됨
         } catch (error) {
             console.error('Reconnection failed:', error);
+            // 재연결 실패 시 버튼 상태 복구
+            if (reconnectButton) {
+                reconnectButton.disabled = false;
+                reconnectButton.textContent = '재연결';
+            }
         }
     }
 
@@ -156,11 +169,11 @@ class OverlayManager {
 
             if (isConnected) {
                 statusDot.classList.remove('disconnected');
-                statusText.textContent = 'Connected';
+                statusText.textContent = this.getMessage('connected');
                 reconnectButton.classList.add('hidden');
             } else {
                 statusDot.classList.add('disconnected');
-                statusText.textContent = 'Disconnected';
+                statusText.textContent = this.getMessage('disconnected');
                 reconnectButton.classList.remove('hidden');
             }
         }
@@ -181,9 +194,11 @@ class OverlayManager {
     removeOverlay() {
         if (this.overlay) {
             this.overlay.remove();
+            this.overlay = null;
         }
         if (this.toggleButton) {
             this.toggleButton.remove();
+            this.toggleButton = null;
         }
     }
 }
