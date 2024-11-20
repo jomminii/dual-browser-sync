@@ -177,3 +177,53 @@ input:checked + .slider:before {
     color: #fff;
     background: #34495e;
 }
+
+.sync-status-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+}
+
+.reconnect-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s ease;
+}
+
+.reconnect-button:hover {
+    background-color: #2980b9;
+}
+
+.reconnect-button:active {
+    background-color: #2472a4;
+}
+
+.hidden {
+    display: none;
+}
+
+.sync-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #bdc3c7;
+}
+
+#syncStatusDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #2ecc71;
+    transition: background-color 0.3s ease;
+}
+
+#syncStatusDot.disconnected {
+    background-color: #e74c3c;
+}

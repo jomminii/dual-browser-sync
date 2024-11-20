@@ -2,6 +2,8 @@ class OverlayManager {
     constructor() {
         this.overlay = null;
         this.toggleButton = null;
+        this.isConnected = false;
+        this.currentUrl = window.location.href;
     }
 
     createOverlay() {
@@ -36,9 +38,14 @@ class OverlayManager {
                     </label>
                     <span>Scroll Sync</span>
                 </div>
-                <div class="sync-status">
-                    <span id="syncStatusDot"></span>
-                    <span id="syncStatusText">Connected</span>
+                <div class="sync-status-container">
+                    <div class="sync-status">
+                        <span id="syncStatusDot"></span>
+                        <span id="syncStatusText">Connected</span>
+                    </div>
+                    <button id="reconnectButton" class="reconnect-button hidden">
+                        재연결
+                    </button>
                 </div>
             </div>
         `;
@@ -60,6 +67,7 @@ class OverlayManager {
         const toggleOverlay = document.getElementById('toggleOverlay');
         const closeSync = document.getElementById('closeSync');
         const showOverlay = document.getElementById('showOverlay');
+        const reconnectButton = document.getElementById('reconnectButton');
 
         // 초기 상태 로드
         chrome.runtime.sendMessage({ action: 'getUrlSyncState' }, (response) => {
@@ -67,6 +75,7 @@ class OverlayManager {
                 urlSyncToggle.checked = response.urlSyncEnabled;
                 scrollSyncToggle.checked = response.scrollSyncEnabled;
                 this.updateSyncStatus(response.isConnected);
+                this.isConnected = response.isConnected;
             }
         });
 
@@ -80,6 +89,7 @@ class OverlayManager {
 
         toggleOverlay.addEventListener('click', () => this.hideOverlay());
         showOverlay.addEventListener('click', () => this.showOverlay());
+        reconnectButton.addEventListener('click', () => this.handleReconnect());
 
         closeSync.addEventListener('click', () => {
             chrome.runtime.sendMessage({ action: 'closeSyncConnection' }, () => {
@@ -108,6 +118,22 @@ class OverlayManager {
         });
     }
 
+    async handleReconnect() {
+        try {
+            chrome.runtime.sendMessage({
+                action: 'createSplitWindows',
+                url: this.currentUrl
+            }, (response) => {
+                if (response?.success) {
+                    this.updateSyncStatus(true);
+                    this.isConnected = true;
+                }
+            });
+        } catch (error) {
+            console.error('Reconnection failed:', error);
+        }
+    }
+
     hideOverlay() {
         this.overlay.classList.add('hidden');
         this.toggleButton.classList.add('visible');
@@ -123,14 +149,19 @@ class OverlayManager {
     updateSyncStatus(isConnected) {
         const statusDot = document.getElementById('syncStatusDot');
         const statusText = document.getElementById('syncStatusText');
+        const reconnectButton = document.getElementById('reconnectButton');
 
-        if (statusDot && statusText) {
+        if (statusDot && statusText && reconnectButton) {
+            this.isConnected = isConnected;
+
             if (isConnected) {
                 statusDot.classList.remove('disconnected');
                 statusText.textContent = 'Connected';
+                reconnectButton.classList.add('hidden');
             } else {
                 statusDot.classList.add('disconnected');
                 statusText.textContent = 'Disconnected';
+                reconnectButton.classList.remove('hidden');
             }
         }
     }
