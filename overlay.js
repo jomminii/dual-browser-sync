@@ -4,12 +4,22 @@ class OverlayManager {
         this.toggleButton = null;
         this.isConnected = false;
         this.currentUrl = window.location.href;
+        this.dragState = {
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            elementX: 0,
+            elementY: 0,
+            element: null
+        };
     }
 
     createOverlay() {
         this.createOverlayElement();
         this.createToggleButton();
         this.setupListeners();
+        this.setupDragListeners();
+        this.loadElementPositions();
     }
 
     getMessage(messageKey) {
@@ -19,6 +29,11 @@ class OverlayManager {
     createOverlayElement() {
         this.overlay = document.createElement('div');
         this.overlay.id = 'sync-overlay';
+        
+        // 초기 위치 설정
+        this.overlay.style.right = '20px';
+        this.overlay.style.top = '20px';
+        
         this.overlay.innerHTML = `
             <div class="sync-controls">
                 <div class="header">
@@ -59,6 +74,11 @@ class OverlayManager {
     createToggleButton() {
         this.toggleButton = document.createElement('div');
         this.toggleButton.id = 'sync-toggle-button';
+        
+        // 초기 위치 설정
+        this.toggleButton.style.right = '20px';
+        this.toggleButton.style.top = '20px';
+        
         this.toggleButton.innerHTML = `
             <button id="showOverlay">≡</button>
         `;
@@ -107,6 +127,114 @@ class OverlayManager {
                 this.hideOverlay();
             }
         });
+    }
+
+    setupDragListeners() {
+        const handleDragStart = (e, element) => {
+            // 버튼이나 입력 요소 클릭 시 드래그 방지
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || 
+                e.target.tagName === 'LABEL' || e.target.closest('.switch')) {
+                return;
+            }
+            
+            const rect = element.getBoundingClientRect();
+            
+            this.dragState = {
+                isDragging: true,
+                startX: e.clientX,
+                startY: e.clientY,
+                initialLeft: rect.left,
+                initialTop: rect.top,
+                element: element
+            };
+            
+            element.classList.add('dragging');
+        };
+    
+        const handleDragMove = (e) => {
+            if (!this.dragState.isDragging) return;
+    
+            e.preventDefault();
+            
+            const dx = e.clientX - this.dragState.startX;
+            const dy = e.clientY - this.dragState.startY;
+            
+            const newLeft = this.dragState.initialLeft + dx;
+            const newTop = this.dragState.initialTop + dy;
+            
+            // 화면 경계 체크
+            const element = this.dragState.element;
+            const rect = element.getBoundingClientRect();
+            const maxX = window.innerWidth - rect.width;
+            const maxY = window.innerHeight - rect.height;
+            
+            // 위치 제한
+            const boundedLeft = Math.max(0, Math.min(maxX, newLeft));
+            const boundedTop = Math.max(0, Math.min(maxY, newTop));
+            
+            // 위치 업데이트
+            element.style.left = `${boundedLeft}px`;
+            element.style.top = `${boundedTop}px`;
+        };
+    
+        const handleDragEnd = () => {
+            if (!this.dragState.isDragging) return;
+            
+            this.dragState.element.classList.remove('dragging');
+            
+            // 현재 위치 저장
+            const positions = {
+                overlayPosition: {
+                    left: this.overlay ? this.overlay.style.left : null,
+                    top: this.overlay ? this.overlay.style.top : null
+                },
+                togglePosition: {
+                    left: this.toggleButton ? this.toggleButton.style.left : null,
+                    top: this.toggleButton ? this.toggleButton.style.top : null
+                }
+            };
+            
+            chrome.storage.local.set({ elementPositions: positions });
+            
+            this.dragState = {
+                isDragging: false,
+                startX: 0,
+                startY: 0,
+                initialLeft: 0,
+                initialTop: 0,
+                element: null
+            };
+        };
+    
+        // 이벤트 리스너 설정
+        [this.overlay, this.toggleButton].forEach(element => {
+            if (element) {
+                element.addEventListener('mousedown', e => handleDragStart(e, element));
+            }
+        });
+        
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
+    }
+    async loadElementPositions() {
+        try {
+            const result = await chrome.storage.local.get('elementPositions');
+            const positions = result.elementPositions;
+            
+            if (positions) {
+                if (positions.overlayPosition && this.overlay) {
+                    this.overlay.style.left = positions.overlayPosition.left;
+                    this.overlay.style.top = positions.overlayPosition.top;
+                }
+                
+                if (positions.togglePosition && this.toggleButton) {
+                    this.toggleButton.style.left = positions.togglePosition.left;
+                    this.toggleButton.style.top = positions.togglePosition.top;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load element positions:', error);
+        }
     }
 
     handleSyncToggle(action, target) {
