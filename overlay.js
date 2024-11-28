@@ -29,40 +29,40 @@ class OverlayManager {
     createOverlayElement() {
         this.overlay = document.createElement('div');
         this.overlay.id = 'sync-overlay';
-        
+
         // 초기 위치 설정
         this.overlay.style.right = '20px';
         this.overlay.style.top = '20px';
-        
+
         this.overlay.innerHTML = `
-            <div class="sync-controls">
-                <div class="header">
-                    <span class="title">${this.getMessage('syncControl')}</span>
-                    <div class="header-buttons">
-                        <button id="toggleOverlay" class="icon-button">━</button>
-                        <button id="closeSync" class="icon-button">×</button>
+            <div class="dps-sync-controls">
+                <div class="dps-header">
+                    <span class="dps-title">${this.getMessage('syncControl')}</span>
+                    <div class="dps-header-buttons">
+                        <button id="toggleOverlay" class="dps-icon-button">━</button>
+                        <button id="closeSync" class="dps-icon-button">×</button>
                     </div>
                 </div>
-                <div class="toggle-container">
-                    <label class="switch">
+                <div class="dps-toggle-container">
+                    <label class="dps-switch">
                         <input type="checkbox" id="urlSyncToggle">
-                        <span class="slider"></span>
+                        <span class="dps-slider"></span>
                     </label>
                     <span>${this.getMessage('urlSync')}</span>
                 </div>
-                <div class="toggle-container">
-                    <label class="switch">
+                <div class="dps-toggle-container">
+                    <label class="dps-switch">
                         <input type="checkbox" id="scrollSyncToggle">
-                        <span class="slider"></span>
+                        <span class="dps-slider"></span>
                     </label>
                     <span>${this.getMessage('scrollSync')}</span>
                 </div>
-                <div class="sync-status-container">
-                    <div class="sync-status">
+                <div class="dps-sync-status-container">
+                    <div class="dps-sync-status">
                         <span id="syncStatusDot"></span>
                         <span id="syncStatusText">${this.getMessage('connected')}</span>
                     </div>
-                    <button id="reconnectButton" class="reconnect-button hidden">
+                    <button id="reconnectButton" class="dps-reconnect-button dps-hidden">
                         ${this.getMessage('reconnect')}
                     </button>
                 </div>
@@ -74,11 +74,11 @@ class OverlayManager {
     createToggleButton() {
         this.toggleButton = document.createElement('div');
         this.toggleButton.id = 'sync-toggle-button';
-        
+
         // 초기 위치 설정
         this.toggleButton.style.right = '20px';
         this.toggleButton.style.top = '20px';
-        
+
         this.toggleButton.innerHTML = `
             <button id="showOverlay">≡</button>
         `;
@@ -132,13 +132,13 @@ class OverlayManager {
     setupDragListeners() {
         const handleDragStart = (e, element) => {
             // 버튼이나 입력 요소 클릭 시 드래그 방지
-            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || 
-                e.target.tagName === 'LABEL' || e.target.closest('.switch')) {
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' ||
+                e.target.tagName === 'LABEL' || e.target.closest('.dps-switch')) {
                 return;
             }
-            
+
             const rect = element.getBoundingClientRect();
-            
+
             this.dragState = {
                 isDragging: true,
                 startX: e.clientX,
@@ -147,41 +147,41 @@ class OverlayManager {
                 initialTop: rect.top,
                 element: element
             };
-            
-            element.classList.add('dragging');
+
+            element.classList.add('dps-dragging');
         };
-    
+
         const handleDragMove = (e) => {
             if (!this.dragState.isDragging) return;
-    
+
             e.preventDefault();
-            
+
             const dx = e.clientX - this.dragState.startX;
             const dy = e.clientY - this.dragState.startY;
-            
+
             const newLeft = this.dragState.initialLeft + dx;
             const newTop = this.dragState.initialTop + dy;
-            
+
             // 화면 경계 체크
             const element = this.dragState.element;
             const rect = element.getBoundingClientRect();
             const maxX = window.innerWidth - rect.width;
             const maxY = window.innerHeight - rect.height;
-            
+
             // 위치 제한
             const boundedLeft = Math.max(0, Math.min(maxX, newLeft));
             const boundedTop = Math.max(0, Math.min(maxY, newTop));
-            
+
             // 위치 업데이트
             element.style.left = `${boundedLeft}px`;
             element.style.top = `${boundedTop}px`;
         };
-    
+
         const handleDragEnd = () => {
             if (!this.dragState.isDragging) return;
-            
-            this.dragState.element.classList.remove('dragging');
-            
+
+            this.dragState.element.classList.remove('dps-dragging');
+
             // 현재 위치 저장
             const positions = {
                 overlayPosition: {
@@ -193,9 +193,9 @@ class OverlayManager {
                     top: this.toggleButton ? this.toggleButton.style.top : null
                 }
             };
-            
+
             chrome.storage.local.set({ elementPositions: positions });
-            
+
             this.dragState = {
                 isDragging: false,
                 startX: 0,
@@ -205,28 +205,29 @@ class OverlayManager {
                 element: null
             };
         };
-    
+
         // 이벤트 리스너 설정
         [this.overlay, this.toggleButton].forEach(element => {
             if (element) {
                 element.addEventListener('mousedown', e => handleDragStart(e, element));
             }
         });
-        
+
         document.addEventListener('mousemove', handleDragMove);
         document.addEventListener('mouseup', handleDragEnd);
     }
+
     async loadElementPositions() {
         try {
             const result = await chrome.storage.local.get('elementPositions');
             const positions = result.elementPositions;
-            
+
             if (positions) {
                 if (positions.overlayPosition && this.overlay) {
                     this.overlay.style.left = positions.overlayPosition.left;
                     this.overlay.style.top = positions.overlayPosition.top;
                 }
-                
+
                 if (positions.togglePosition && this.toggleButton) {
                     this.toggleButton.style.left = positions.togglePosition.left;
                     this.toggleButton.style.top = positions.togglePosition.top;
@@ -276,14 +277,14 @@ class OverlayManager {
     }
 
     hideOverlay() {
-        this.overlay.classList.add('hidden');
-        this.toggleButton.classList.add('visible');
+        this.overlay.classList.add('dps-hidden');
+        this.toggleButton.classList.add('dps-visible');
         chrome.storage.local.set({ overlayHidden: true });
     }
 
     showOverlay() {
-        this.overlay.classList.remove('hidden');
-        this.toggleButton.classList.remove('visible');
+        this.overlay.classList.remove('dps-hidden');
+        this.toggleButton.classList.remove('dps-visible');
         chrome.storage.local.set({ overlayHidden: false });
     }
 
@@ -296,13 +297,13 @@ class OverlayManager {
             this.isConnected = isConnected;
 
             if (isConnected) {
-                statusDot.classList.remove('disconnected');
+                statusDot.classList.remove('dps-disconnected');
                 statusText.textContent = this.getMessage('connected');
-                reconnectButton.classList.add('hidden');
+                reconnectButton.classList.add('dps-hidden');
             } else {
-                statusDot.classList.add('disconnected');
+                statusDot.classList.add('dps-disconnected');
                 statusText.textContent = this.getMessage('disconnected');
-                reconnectButton.classList.remove('hidden');
+                reconnectButton.classList.remove('dps-hidden');
             }
         }
     }
@@ -329,6 +330,6 @@ class OverlayManager {
             this.toggleButton = null;
         }
     }
-}
+ }
 
-window.OverlayManager = OverlayManager;
+ window.OverlayManager = OverlayManager;
